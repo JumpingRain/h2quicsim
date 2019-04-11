@@ -48,7 +48,8 @@ func NewClient(db []Entry) (Client, error) {
 
 func (cl *client) Run(addr string) error {
 	cl.st = time.Now()
-	for _, ents := range cl.connMap {
+	for conn, ents := range cl.connMap {
+		log.Printf("dial %v", conn)
 		sess, err := quic.DialAddr(addr,
 			&tls.Config{InsecureSkipVerify: true},
 			&quic.Config{CreatePaths: true},
@@ -69,7 +70,7 @@ func (cl *client) Wait() {
 }
 
 func (cl *client) handleSess(sess quic.Session, ents []*Entry) {
-	defer sess.Close(nil)
+	// defer sess.Close(nil)
 	conn := &clientConn{cl: cl, ents: ents, sess: sess}
 	err := conn.run()
 	if err != nil {
@@ -135,6 +136,8 @@ func (c *clientConn) doRequest() {
 	h2framer := http2.NewFramer(c.header, nil)
 
 	for ent := range c.reqs {
+		log.Printf("write header for stream %v", ent.Stream)
+
 		c.stTime[ent.Stream] = time.Now()
 
 		var headers bytes.Buffer
@@ -176,16 +179,20 @@ func (c *clientConn) run() error {
 		if sid != ent.Stream {
 			return ErrDB
 		}
+		log.Printf("open stream %v for %v", sid, ent.URL)
 		c.entMap[sid] = ent
 	}
 
 	var wg sync.WaitGroup
+	c.reqs = make(chan *Entry)
+	go c.handleHeader()
 	go c.doRequest()
 	for _, ent := range c.ents {
 		wg.Add(1)
 		go func(e *Entry) {
+			log.Println(e.URL)
 			pa := e.Initiator
-			if fi, ok := c.cl.fin[pa]; ok {
+			if fi := c.cl.fin[pa]; fi != nil {
 				<-fi
 			}
 			c.reqs <- e

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"log"
+	"sync"
 
 	"github.com/lucas-clemente/quic-go"
 	"golang.org/x/net/http2"
@@ -13,7 +14,7 @@ import (
 
 // Server is the interface for the simulation server
 type Server interface {
-	Listen(string, string, string) error
+	Listen(addr string, certFile string, privFile string) error
 }
 
 type server struct {
@@ -70,8 +71,9 @@ func (s *server) handleSess(sess quic.Session) {
 type serverConn struct {
 	serv *server
 
-	sess   quic.Session
-	header quic.Stream
+	sess       quic.Session
+	header     quic.Stream
+	headerLock sync.Mutex
 
 	h2framer *http2.Framer
 	h2pack   *hpack.Decoder
@@ -121,18 +123,20 @@ func (c *serverConn) handleData(stream quic.Stream, enc string) {
 	db := c.serv.objMap
 	if resp, ok := db[enc]; ok {
 		var headers bytes.Buffer
-		enc := hpack.NewEncoder(&headers)
+		h2pack := hpack.NewEncoder(&headers)
 
 		for _, h := range resp.Response {
-			enc.WriteField(h)
+			h2pack.WriteField(h)
 		}
 
+		c.headerLock.Lock()
 		framer := http2.NewFramer(c.header, nil)
 		err := framer.WriteHeaders(http2.HeadersFrameParam{
 			StreamID:      uint32(stream.StreamID()),
 			EndHeaders:    true,
 			BlockFragment: headers.Bytes(),
 		})
+		c.headerLock.Unlock()
 		if err != nil {
 			log.Println(err)
 		}

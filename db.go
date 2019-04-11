@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+	"os"
 	"time"
 
 	"golang.org/x/net/http2/hpack"
@@ -59,4 +61,18 @@ func LoadObjects(r io.Reader) ([]Entry, error) {
 		return nil, err
 	}
 	return ret, nil
+}
+
+// LoadObjectsPath read from file
+func LoadObjectsPath(path string) []Entry {
+	fin, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer fin.Close()
+	db, err := LoadObjects(fin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return db
 }
