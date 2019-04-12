@@ -163,6 +163,7 @@ func (c *serverConn) run() error {
 	if err != nil {
 		return err
 	}
+	header.SetPriority(0, 256)
 	c.header = header
 
 	c.h2framer = http2.NewFramer(nil, header)
