@@ -58,7 +58,7 @@ func (cl *client) Run(addr string) error {
 			return err
 		}
 
-		go cl.handleSess(sess, ents)
+		go cl.handleSess(sess, conn, ents)
 	}
 	return nil
 }
@@ -69,10 +69,10 @@ func (cl *client) Wait() {
 	}
 }
 
-func (cl *client) handleSess(sess quic.Session, ents []*Entry) {
+func (cl *client) handleSess(sess quic.Session, conn int, ents []*Entry) {
 	// defer sess.Close(nil)
-	conn := &clientConn{cl: cl, ents: ents, sess: sess}
-	err := conn.run()
+	c := &clientConn{cl: cl, ents: ents, sess: sess, conn: conn}
+	err := c.run()
 	if err != nil {
 		log.Println(err)
 	}
@@ -82,6 +82,7 @@ type clientConn struct {
 	cl     *client
 	ents   []*Entry
 	entMap map[int]*Entry
+	conn   int
 
 	sess   quic.Session
 	header quic.Stream
@@ -103,8 +104,8 @@ func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	sid := int(data.StreamID())
 	st := c.stTime[sid]
 	cu := time.Now()
-	log.Printf("stream %v finish", sid)
-	fmt.Println(sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
+	log.Printf("conn %v stream %v finish", c.conn, sid)
+	fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
 	close(c.cl.fin[url])
 }
 
@@ -126,7 +127,7 @@ func (c *clientConn) handleHeader() {
 		ent := c.entMap[sid]
 		size := ent.Size
 
-		log.Printf("stream %v size %v", sid, size)
+		log.Printf("conn %v stream %v size %v", c.conn, sid, size)
 		data, _ := c.sess.(streamCreator).GetOrOpenStream(quic.StreamID(sid))
 		go c.handleData(data, size, ent.URL)
 	}
@@ -136,7 +137,7 @@ func (c *clientConn) doRequest() {
 	h2framer := http2.NewFramer(c.header, nil)
 
 	for ent := range c.reqs {
-		log.Printf("write header for stream %v", ent.Stream)
+		log.Printf("conn %v write header for stream %v", c.conn, ent.Stream)
 
 		c.stTime[ent.Stream] = time.Now()
 
@@ -179,7 +180,7 @@ func (c *clientConn) run() error {
 		if sid != ent.Stream {
 			return ErrDB
 		}
-		log.Printf("open stream %v for %v", sid, ent.URL)
+		log.Printf("conn %v open stream %v for %v", c.conn, sid, ent.URL)
 		c.entMap[sid] = ent
 	}
 

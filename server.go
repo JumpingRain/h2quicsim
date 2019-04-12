@@ -147,7 +147,10 @@ func (c *serverConn) handleData(stream quic.Stream, enc string) {
 		}
 		log.Printf("response %v with %v bytes", enc, length)
 		n, err := stream.Write(make([]byte, length))
-		log.Println(n, err)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Printf("finish %v with %v bytes", enc, n)
 	} else {
 		log.Printf("response %v not found, ignore", enc)
 	}
