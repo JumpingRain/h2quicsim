@@ -28,7 +28,9 @@ func NewServer(db []Entry) (Server, error) {
 	for idx, ent := range db {
 		enc := encodeObject(ent.Request)
 		if _, ok := ret.objMap[enc]; ok {
-			// duplicate object with same method host & path
+			// we ignore duplicate request
+			log.Printf("duplicate request %v", enc)
+			// continue
 			return nil, ErrDB
 		}
 		ret.objMap[enc] = &db[idx]

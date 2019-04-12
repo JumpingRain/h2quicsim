@@ -93,6 +93,17 @@ type clientConn struct {
 	stTime map[int]time.Time
 }
 
+// prevent a channel from closing twice
+// only works if channel cannot receive data
+func safeClose(ch chan struct{}) {
+	select {
+	case <-ch:
+		// do nothing
+	default:
+		close(ch)
+	}
+}
+
 func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	buf := make([]byte, size)
 	for n, err := data.Read(buf); n != 0 && err != io.EOF; n, err = data.Read(buf) {
@@ -106,6 +117,7 @@ func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	cu := time.Now()
 	log.Printf("conn %v stream %v finish", c.conn, sid)
 	fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
+	// safeClose(c.cl.fin[url])
 	close(c.cl.fin[url])
 }
 
