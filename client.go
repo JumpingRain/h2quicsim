@@ -116,7 +116,9 @@ func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	st := c.stTime[sid]
 	cu := time.Now()
 	log.Printf("conn %v stream %v finish", c.conn, sid)
-	fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
+	if sid > 9 {
+		fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
+	}
 	// safeClose(c.cl.fin[url])
 	close(c.cl.fin[url])
 }
@@ -203,7 +205,7 @@ func (c *clientConn) run() error {
 	for _, ent := range c.ents {
 		wg.Add(1)
 		go func(e *Entry) {
-			log.Println(e.URL)
+			// log.Println(e.URL)
 			pa := e.Initiator
 			if fi := c.cl.fin[pa]; fi != nil {
 				<-fi
