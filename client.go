@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"sync"
+	// "sync"
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
@@ -117,7 +117,8 @@ func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	cu := time.Now()
 	log.Printf("conn %v stream %v finish", c.conn, sid)
 	if sid > 9 {
-		fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu))
+		ent := c.entMap[sid]
+		fmt.Println(c.conn, sid, msec(st, cu), msec(c.st, cu), msec(c.cl.st, cu), size, ent.Dependency, ent.Weight)
 	}
 	// safeClose(c.cl.fin[url])
 	close(c.cl.fin[url])
@@ -198,24 +199,32 @@ func (c *clientConn) run() error {
 		c.entMap[sid] = ent
 	}
 
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 	c.reqs = make(chan *Entry)
 	go c.handleHeader()
 	go c.doRequest()
-	for _, ent := range c.ents {
-		wg.Add(1)
-		go func(e *Entry) {
-			// log.Println(e.URL)
-			pa := e.Initiator
-			if fi := c.cl.fin[pa]; fi != nil {
-				<-fi
-			}
-			c.reqs <- e
-			wg.Done()
-		}(ent)
+	// for _, ent := range c.ents {
+	// 	wg.Add(1)
+	// 	go func(e *Entry) {
+	// 		// log.Println(e.URL)
+	// 		pa := e.Initiator
+	// 		if fi := c.cl.fin[pa]; fi != nil {
+	// 			<-fi
+	// 		}
+	// 		c.reqs <- e
+	// 		wg.Done()
+	// 	}(ent)
+	// }
+
+	for _, e := range c.ents {
+		pa := e.Initiator
+		if fi := c.cl.fin[pa]; fi != nil {
+			<-fi
+		}
+		c.reqs <- e
 	}
 
-	wg.Wait()
+	// wg.Wait()
 	close(c.reqs)
 	return nil
 }

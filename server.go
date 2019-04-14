@@ -122,6 +122,7 @@ func (c *serverConn) handleData(stream quic.Stream, enc string) {
 	stream.(remoteCloser).CloseRemote(0)
 	stream.Read([]byte{0})
 
+	sid := stream.StreamID()
 	db := c.serv.objMap
 	if resp, ok := db[enc]; ok {
 		var headers bytes.Buffer
@@ -147,14 +148,14 @@ func (c *serverConn) handleData(stream quic.Stream, enc string) {
 		if length <= 0 {
 			length = 1
 		}
-		log.Printf("response %v with %v bytes", enc, length)
+		log.Printf("response %v with %v bytes", sid, length)
 		n, err := stream.Write(make([]byte, length))
 		if err != nil {
 			log.Println(err)
 		}
-		log.Printf("finish %v with %v bytes", enc, n)
+		log.Printf("finish %v with %v bytes", sid, n)
 	} else {
-		log.Printf("response %v not found, ignore", enc)
+		log.Printf("response %v not found, ignore", sid)
 	}
 }
 
