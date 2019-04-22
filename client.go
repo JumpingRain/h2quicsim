@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	// "sync"
+	"sync"
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
@@ -89,8 +89,9 @@ type clientConn struct {
 
 	reqs chan *Entry
 
-	st     time.Time
-	stTime map[int]time.Time
+	st         time.Time
+	stTime     map[int]time.Time
+	stTimeLock sync.RWMutex
 }
 
 // prevent a channel from closing twice
@@ -113,7 +114,9 @@ func (c *clientConn) handleData(data quic.Stream, size int, url string) {
 	}
 
 	sid := int(data.StreamID())
+	c.stTimeLock.RLock()
 	st := c.stTime[sid]
+	c.stTimeLock.RUnlock()
 	cu := time.Now()
 	log.Printf("conn %v stream %v finish", c.conn, sid)
 	if sid > 9 {
@@ -154,7 +157,9 @@ func (c *clientConn) doRequest() {
 	for ent := range c.reqs {
 		log.Printf("conn %v write header for stream %v", c.conn, ent.Stream)
 
+		c.stTimeLock.Lock()
 		c.stTime[ent.Stream] = time.Now()
+		c.stTimeLock.Unlock()
 
 		var headers bytes.Buffer
 		h2pack := hpack.NewEncoder(&headers)
